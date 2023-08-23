@@ -25,6 +25,8 @@ def save_report_to_file(content, filename):
 
     with open(f"output/reports/{filename}", 'w') as file:
         file.write(clean_content)
+
+
 def report_work_by_date(month):
     schedule_data = load_data_from_json(f"output/schedule_{month}.json")
 

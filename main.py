@@ -1,6 +1,6 @@
 from testing import *
 from reports import *
-
+import excel_handler
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<< EMPLOYEE AND EMPLOYEES CLASSES >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -329,4 +329,4 @@ def test(month):
     report_errors(month)
 
 
-main()
+excel_handler.generate_excel_reports("09")
