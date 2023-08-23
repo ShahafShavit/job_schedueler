@@ -1,6 +1,7 @@
 from testing import *
 from reports import *
 import excel_handler
+import ics_handler
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<< EMPLOYEE AND EMPLOYEES CLASSES >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -150,12 +151,13 @@ class Venue:
 class Schedule:
     def __init__(self, month):
         self.month = month
+        self.temp_unavailable = {}
         if self.schedule_exists():
             print("Schedule exists, no need to generate.")
             self.load_from_file()
         else:
             self.schedule_data = {}
-            self.temp_unavailable = {}
+
     def schedule_exists(self):
         return path.exists(f"output/schedule_{self.month}.json")
 
@@ -304,10 +306,12 @@ def main():
             monthly_schedule.generate_schedule_for_venue(venue, employee_manager.employees)
         monthly_schedule.save_to_file()
 
-    report_work_by_date(month)
-    report_venue_dates_with_workers(month)
-    report_worker_shifts(month)
-    report_errors(month)
+    # report_work_by_date(month)
+    # report_venue_dates_with_workers(month)
+    # report_worker_shifts(month)
+    # report_errors(month)
+    # excel_handler.generate_excel_reports(month)
+    ics_handler.generate_ics(monthly_schedule,month)
     # monthly_schedule.manually_add_popup_event(employee_manager)
 
 def test(month):
@@ -328,5 +332,4 @@ def test(month):
     report_worker_shifts(month)
     report_errors(month)
 
-
-excel_handler.generate_excel_reports("09")
+main()
