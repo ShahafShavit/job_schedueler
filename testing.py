@@ -1,12 +1,12 @@
 from json_handler import *
 import random
-
-def generate_dummy_employee_data(month, num_employees=10):
+from os import remove
+def generate_dummy_employee_data(month, num_employees=10): # <<<<< DEPRECATED >>>>>>>
     filename = "employees.json"
     data = []
 
     # Fetch the number of venues from the venues file
-    venues_data = load_data_from_json(f"venues_{month}.json")
+    venues_data = load_data_from_json(f"data/venues_{month}.json")
     num_venues = len(venues_data)
     venue_names = [venue["name"] for venue in venues_data]
 
@@ -21,61 +21,65 @@ def generate_dummy_employee_data(month, num_employees=10):
 
     save_data_to_json(filename, data)
 
-
 def generate_dummy_shift_data(month):
-    filename = f"shifts_{month}.json"
+    filename = f"data/shifts_{month}.json"
     data = []
 
-    # Fetch the number of employees from the employees file
+    # Fetch the employee names from the employees file
     employees_data = load_data_from_json("employees.json")
-    num_employees = len(employees_data)
 
-    for i in range(1, num_employees + 1):
+    for emp_data in employees_data:
         # Generate random number of unavailable dates for each employee
         num_unavailable_dates = random.randint(1, 8)
         unavailable_dates = [f"{random.randint(1, 30)}/{month}" for _ in range(num_unavailable_dates)]
 
+        # Sort the dates
+        unavailable_dates = sorted(list(set(unavailable_dates)), key=lambda x: (int(x.split("/")[1]), int(x.split("/")[0])))
+
         data.append({
-            "id": f"#E{i}",
-            "unavailable_dates": list(set(unavailable_dates))  # Remove duplicates
+            "id": emp_data["id"],
+            "unavailable_dates": unavailable_dates
         })
 
     save_data_to_json(filename, data)
 
-def generate_dummy_venue_data(month, num_venues=5):
-    filename = f"venues_{month}.json"
+def generate_dummy_venue_data(month):
+    filename = f"data/venues_{month}.json"
     data = []
 
-    for i in range(1, num_venues + 1):
+    # Fetch the venue names from the employees file
+    employees_data = load_data_from_json("employees.json")
+    venue_names = list(set(venue for emp in employees_data for venue in emp["allowed_venues"].keys()))
+
+    for venue_name in venue_names:
         # Generate random number of event dates for each venue
         num_event_dates = random.randint(10, 14)
         event_dates = [f"{random.randint(1, 30)}/{month}" for _ in range(num_event_dates)]
 
+        # Sort the dates
+        event_dates = sorted(list(set(event_dates)), key=lambda x: (int(x.split("/")[1]), int(x.split("/")[0])))
+
         data.append({
-            "name": f"Venue {chr(64 + i)}",  # This will give names like Venue A, Venue B, etc.
-            "event_dates": list(set(event_dates))  # Remove duplicates
+            "name": venue_name,
+            "event_dates": event_dates
         })
 
     save_data_to_json(filename, data)
 
 
-def test_schedule(month):
-    schedule_data = load_data_from_json(f"schedule_{month}.json")
-    employees_data = load_data_from_json("employees.json")
-    shifts_data = load_data_from_json(f"shifts_{month}.json")
 
-    employee_unavailable_dates = {shift["id"]: shift["unavailable_dates"] for shift in shifts_data}
-    employee_allowed_venues = {emp["id"]: emp["allowed_venues"] for emp in employees_data}
+def delete_files_for_month(month):
+    files_to_delete = [
+        f"data/venues_{month}.json",
+        f"data/shifts_{month}.json",
+        f"output/schedule_{month}.json"
+    ]
 
-    for venue, dates in schedule_data.items():
-        if venue != "shifts":
-            for date, employee_id in dates.items():
-                if date in employee_unavailable_dates.get(employee_id, []):
-                    print(f"Error: {employee_id} was assigned on {date} at {venue} but they are unavailable.")
-                    return False
-                if venue not in employee_allowed_venues.get(employee_id, []):
-                    print(f"Error: {employee_id} was assigned to {venue} but they are not allowed to work there.")
-                    return False
-
-    print("Employees assigned without errors.")
-    return True
+    for filename in files_to_delete:
+        try:
+            remove(filename)
+            print(f"Deleted {filename}")
+        except FileNotFoundError:
+            print(f"{filename} not found.")
+        except Exception as e:
+            print(f"Error deleting {filename}: {e}")
