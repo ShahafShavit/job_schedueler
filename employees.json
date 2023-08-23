@@ -1,0 +1,55 @@
+[
+    {
+        "id": "#E1",
+        "allowed_venues": [
+            "Venue A"
+        ]
+    },
+    {
+        "id": "#E2",
+        "allowed_venues": [
+            "Venue D"
+        ]
+    },
+    {
+        "id": "#E3",
+        "allowed_venues": [
+            "Venue D",
+            "Venue A",
+            "Venue B"
+        ]
+    },
+    {
+        "id": "#E4",
+        "allowed_venues": [
+            "Venue D",
+            "Venue B"
+        ]
+    },
+    {
+        "id": "#E5",
+        "allowed_venues": [
+            "Venue D"
+        ]
+    },
+    {
+        "id": "#E6",
+        "allowed_venues": [
+            "Venue C",
+            "Venue B"
+        ]
+    },
+    {
+        "id": "#E7",
+        "allowed_venues": [
+            "Venue B"
+        ]
+    },
+    {
+        "id": "#E8",
+        "allowed_venues": [
+            "Venue D",
+            "Venue B"
+        ]
+    }
+]

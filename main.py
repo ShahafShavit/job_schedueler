@@ -1,181 +1,161 @@
-import json
-import random
+from testing import *
 
-# <<<<<<<<<<<<<<<<<<<<<<<<<<<<< GENERAL CLASSES AND METHODS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-def load_data_from_json(filename):
-    with open(filename, 'r') as file:
-        return json.load(file)
-
-def save_data_to_json(filename, data):
-    with open(filename, 'w') as file:
-        json.dump(data, file, indent=4)
-
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<< EMPLOYEE AND EMPLOYEES CLASSES >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 class Employee:
-    def __init__(self, id, unavailable_dates):
+    def __init__(self, id, allowed_venues):
         self.id = id
-        self.unavailable_dates = unavailable_dates
+        self.allowed_venues = allowed_venues
+        self.unavailable_dates = []  # This will be populated from the shifts file
         self.shift_count = 0
+
+    def increment_shift(self):
+        self.shift_count += 1
+
+class Employees:
+    def __init__(self, month):
+        self.month = month
+        self.employees = self.load_from_file()
+
+    def load_from_file(self):
+        employees_data = load_data_from_json("employees.json")
+        shifts_data = load_data_from_json(f"shifts_{self.month}.json")
+
+        employees = []
+        for data in employees_data:
+            employee = Employee(data["id"], data["allowed_venues"])
+            shift = next((s for s in shifts_data if s["id"] == employee.id), None)
+            if shift:
+                employee.unavailable_dates = shift["unavailable_dates"]
+            employees.append(employee)
+
+        return employees
+
+    def save_to_file(self):
+        data = [{"id": emp.id, "allowed_venues": emp.allowed_venues} for emp in self.employees]
+        save_data_to_json("employees.json", data)
+
+        shifts_data = [{"id": emp.id, "unavailable_dates": emp.unavailable_dates} for emp in self.employees]
+        save_data_to_json(f"shifts_{self.month}.json", shifts_data)
+
+    def load_shifts(self):
+        shifts_data = load_data_from_json(f"shifts_{self.month}.json")
+        for shift in shifts_data:
+            employee = next((e for e in self.employees if e.id == shift["id"]), None)
+            if employee:
+                employee.unavailable_dates = shift["unavailable_dates"]
+
+    def save_shifts(self):
+        data = [{"id": emp.id, "unavailable_dates": emp.unavailable_dates} for emp in self.employees]
+        save_data_to_json(f"shifts_{self.month}.json", data)
+    def add_or_update_employee(self, employee_id, unavailable_dates):
+        for emp in self.employees:
+            if emp.id == employee_id:
+                emp.unavailable_dates = unavailable_dates
+                return
+        self.employees.append(Employee(employee_id, unavailable_dates))
+        self.save_to_file()
+
+
+
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<< VENUE CLASS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 class Venue:
     def __init__(self, name, event_dates):
         self.name = name
         self.event_dates = event_dates
 
+    @classmethod
+    def load_all_from_file(cls, month):
+        venues_data = load_data_from_json(f"venues_{month}.json")
+        return [cls(data["name"], data["event_dates"]) for data in venues_data]
+    @classmethod
+    def save_all_to_file(cls, month, venues):
+        data = [{"name": venue.name, "event_dates": venue.event_dates} for venue in venues]
+        save_data_to_json(f"venues_{month}.json", data)
+
+    @classmethod
+    def add_or_update_venue(cls, month, venue_name, event_dates):
+        venues = cls.load_all_from_file(month)
+        for venue in venues:
+            if venue.name == venue_name:
+                venue.event_dates = event_dates
+                break
+        else:
+            venues.append(cls(venue_name, event_dates))
+        cls.save_all_to_file(month, venues)
+
+
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<< SCHEDULE CLASS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 class Schedule:
     def __init__(self, month):
         self.month = month
         self.schedule_data = {}
+        self.temp_unavailable = {}
 
     def add_to_schedule(self, venue_name, date, employee_id):
         if venue_name not in self.schedule_data:
             self.schedule_data[venue_name] = {}
         self.schedule_data[venue_name][date] = employee_id
+        if date not in self.temp_unavailable:
+            self.temp_unavailable[date] = []
+        self.temp_unavailable[date].append(employee_id)
 
-    def get_schedule_for_venue(self, venue_name):
-        return self.schedule_data.get(venue_name, {})
+    def get_available_employees(self, date, venue_name, employees):
+        # Exclude employees who worked the previous day
+        previous_day = f"{int(date.split('/')[0]) - 1}/{date.split('/')[1]}"
+        recently_worked = self.temp_unavailable.get(previous_day, [])
 
+        return [employee for employee in employees if
+                date not in employee.unavailable_dates and
+                employee.id not in self.temp_unavailable.get(date, []) and
+                employee.id not in recently_worked and
+                venue_name in employee.allowed_venues]
 
-def add_employee_data(month, employee_id, unavailable_dates):
-    filename = f"employees_{month}.json"
+    def assign_employee_to_date(self, date, available_employees):
+        # Sort employees by shift count
+        available_employees.sort(key=lambda x: x.shift_count)
 
-    # Load existing data
-    data = load_data_from_json(filename)
+        # If multiple employees have the same shift count, choose randomly among them
+        min_shifts = available_employees[0].shift_count
+        candidates = [emp for emp in available_employees if emp.shift_count == min_shifts]
+        chosen_employee = random.choice(candidates)
 
-    # Check if employee already exists
-    for emp in data:
-        if emp["id"] == employee_id:
-            print(f"Employee with ID {employee_id} already exists. Updating data.")
-            emp["unavailable_dates"] = unavailable_dates
-            break
-    else:
-        # If employee doesn't exist, add new entry
-        data.append({
-            "id": employee_id,
-            "unavailable_dates": unavailable_dates
-        })
+        chosen_employee.shift_count += 1
+        return chosen_employee
 
-    # Save updated data
-    save_data_to_json(filename, data)
+    def generate_schedule_for_venue(self, venue, employees):
+        for date in venue.event_dates:
+            available_employees = self.get_available_employees(date, venue.name, employees)  # Pass the venue name
+            if available_employees:
+                chosen_employee = self.assign_employee_to_date(date, available_employees)
+                self.add_to_schedule(venue.name, date, chosen_employee.id)
 
+    def save_to_file(self):
+        save_data_to_json(f"schedule_{self.month}.json", self.schedule_data)
 
-def add_venue_data(month, venue_name, event_dates):
-    filename = f"venues_{month}.json"
-
-    # Load existing data
-    data = load_data_from_json(filename)
-
-    # Check if venue already exists
-    for venue in data:
-        if venue["name"] == venue_name:
-            print(f"Venue {venue_name} already exists. Updating data.")
-            venue["event_dates"] = event_dates
-            break
-    else:
-        # If venue doesn't exist, add new entry
-        data.append({
-            "name": venue_name,
-            "event_dates": event_dates
-        })
-
-    # Save updated data
-    save_data_to_json(filename, data)
+    def sort_schedule_by_date(self):
+        # Sort the dates for each venue
+        for venue, dates in self.schedule_data.items():
+            if venue != "shifts":
+                sorted_dates = dict(sorted(dates.items(), key=lambda item: list(map(int, item[0].split("/")))))
+                self.schedule_data[venue] = sorted_dates
+        self.save_to_file()
 
 
-# <<<<<<<<<<<<<<<<<<< TESTING AND SORTING >>>>>>>>>>>>>>>>>>>>>>>>>
 
-
-def generate_dummy_employee_data(month, num_employees=10):
-    filename = f"employees_{month}.json"
-    data = []
-
-    for i in range(1, num_employees + 1):
-        # Generate random number of unavailable dates for each employee
-        num_unavailable_dates = random.randint(1, 8)
-        unavailable_dates = [f"{random.randint(1, 30)}/{month}" for _ in range(num_unavailable_dates)]
-
-        data.append({
-            "id": f"#E{i}",
-            "unavailable_dates": list(set(unavailable_dates))  # Remove duplicates
-        })
-
-    save_data_to_json(filename, data)
-
-
-def generate_dummy_venue_data(month, num_venues=5):
-    filename = f"venues_{month}.json"
-    data = []
-
-    for i in range(1, num_venues + 1):
-        # Generate random number of event dates for each venue
-        num_event_dates = random.randint(10, 14)
-        event_dates = [f"{random.randint(1, 30)}/{month}" for _ in range(num_event_dates)]
-
-        data.append({
-            "name": f"Venue {chr(64 + i)}",  # This will give names like Venue A, Venue B, etc.
-            "event_dates": list(set(event_dates))  # Remove duplicates
-        })
-
-    save_data_to_json(filename, data)
-
-def test_schedule(month):
-    schedule_data = load_data_from_json(f"schedule_{month}.json")
-    employees_data = load_data_from_json(f"employees_{month}.json")
-
-    employee_unavailable_dates = {emp["id"]: emp["unavailable_dates"] for emp in employees_data}
-
-    for venue, dates in schedule_data.items():
-        if venue != "shifts":
-            for date, employee_id in dates.items():
-                if date in employee_unavailable_dates[employee_id]:
-                    print(f"Error: {employee_id} was assigned on {date} at {venue} but they are unavailable.")
-                    return False
-    print("Employees assigned without errors.")
-    return True
-
-
-def sort_schedule_by_date(month):
-    schedule_data = load_data_from_json(f"schedule_{month}.json")
-
-    # Sort the dates for each venue
-    for venue, dates in schedule_data.items():
-        if venue != "shifts":
-            sorted_dates = dict(sorted(dates.items(), key=lambda item: list(map(int, item[0].split("/")))))
-            schedule_data[venue] = sorted_dates
-
-    save_data_to_json(f"schedule_{month}.json", schedule_data)
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<< MISC FUNCTIONS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-def get_available_employees(date, employees):
-    return [employee for employee in employees if date not in employee.unavailable_dates]
 
-def assign_employee_to_date(date, available_employees):
-    available_employees.sort(key=lambda x: x.shift_count)
-    chosen_employee = available_employees[0]
-    chosen_employee.shift_count += 1
-    return chosen_employee
 
-def generate_schedule_for_venue(venue, employees):
-    venue_schedule = {}
-    for date in venue.event_dates:
-        available_employees = get_available_employees(date, employees)
-        if available_employees:
-            chosen_employee = assign_employee_to_date(date, available_employees)
-            venue_schedule[date] = chosen_employee.id
-    return venue_schedule
-
-def calculate_shifts_for_employees(schedule_data, employees):
-    shifts = {}
-    for venue_schedule in schedule_data.values():
-        for employee_id in venue_schedule.values():
-            shifts[employee_id] = shifts.get(employee_id, 0) + 1
-    return shifts
-
-def show_assignments(month, specific_date=None):
+def generate_report(month):
     schedule_data = load_data_from_json(f"schedule_{month}.json")
 
     # Create a dictionary to group assignments by date
     grouped_by_date = {}
+
+    # Create a dictionary to count shifts for each employee
+    shifts_count = {}
 
     for venue, dates in schedule_data.items():
         if venue != "shifts":
@@ -184,40 +164,39 @@ def show_assignments(month, specific_date=None):
                     grouped_by_date[date] = []
                 grouped_by_date[date].append((venue, employee_id))
 
-    if specific_date:
-        assignments = grouped_by_date.get(specific_date, [])
-        print(f"On {specific_date}: {assignments}")
-    else:
-        for date, assignments in sorted(grouped_by_date.items(), key=lambda x: list(map(int, x[0].split("/")))):
-            print(f"{date}- {assignments}")
+                # Count shifts for each employee
+                shifts_count[employee_id] = shifts_count.get(employee_id, 0) + 1
+
+    # Display assignments for each date
+    for date, assignments in sorted(grouped_by_date.items(), key=lambda x: list(map(int, x[0].split("/")))):
+        print(f"{date}- {assignments}")
+
+    # Display the number of shifts each employee received
+    print("\nShifts count for each employee:")
+    for employee_id, count in shifts_count.items():
+        print(f"{employee_id}: {count} shifts")
 
 
 def main():
-    # Load employees and venues for a specific month
     month = "09"
-    employees_data = load_data_from_json(f"employees_{month}.json")
-    venues_data = load_data_from_json(f"venues_{month}.json")
+    employee_manager = Employees(month)
+    employee_manager.load_shifts()
+    venues = Venue.load_all_from_file(month)
 
-    employees = [Employee(data["id"], data["unavailable_dates"]) for data in employees_data]
-    venues = [Venue(data["name"], data["event_dates"]) for data in venues_data]
-
-    # Create a schedule for the month
     monthly_schedule = Schedule(month)
-
     for venue in venues:
-        venue_schedule = generate_schedule_for_venue(venue, employees)
-        for date, emp_id in venue_schedule.items():
-            monthly_schedule.add_to_schedule(venue.name, date, emp_id)
-    # Calculate shifts for each employee
-    shifts = calculate_shifts_for_employees(monthly_schedule.schedule_data, employees)
+        monthly_schedule.generate_schedule_for_venue(venue, employee_manager.employees)
 
-    # Save the schedule to JSON
-    schedule_to_save = monthly_schedule.schedule_data
-    schedule_to_save["shifts"] = shifts
-    save_data_to_json(f"schedule_{month}.json", schedule_to_save)
+    monthly_schedule.save_to_file()
 
-def test():
-    generate_dummy_employee_data("09",8)
-    generate_dummy_venue_data("09",3)
 
-show_assignments("09")
+def test(month):
+    generate_dummy_venue_data(month,num_venues=4)
+    generate_dummy_shift_data(month)
+
+
+test("09")
+main()
+test_schedule("09")
+generate_report("09")
+
