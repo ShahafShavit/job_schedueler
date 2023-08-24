@@ -25,7 +25,7 @@ def column_auto_width(ws):
 
 
 def report_work_by_date_to_excel(month, wb):
-    schedule_data = load_data_from_json(f"output/schedule_{month}.json")
+    schedule_data = load_data_from_json(f"{config.get_location('output')}schedule_{month}.json")
     ws = wb.create_sheet(title="Work By Date")
 
     # Create a dictionary to group assignments by date
@@ -62,7 +62,7 @@ def report_work_by_date_to_excel(month, wb):
     column_auto_width(ws)
 
 def report_venue_dates_with_workers_to_excel(month, wb):
-    schedule_data = load_data_from_json(f"output/schedule_{month}.json")
+    schedule_data = load_data_from_json(f"{config.get_location('output')}schedule_{month}.json")
     ws = wb.create_sheet(title="Venue Dates With Workers")
 
     for venue, dates in schedule_data.items():
@@ -74,7 +74,7 @@ def report_venue_dates_with_workers_to_excel(month, wb):
 
 
 def report_worker_shifts_to_excel(month, wb):
-    schedule_data = load_data_from_json(f"output/schedule_{month}.json")
+    schedule_data = load_data_from_json(f"{config.get_location('output')}schedule_{month}.json")
 
     worker_shifts = {}
     for venue, dates in schedule_data.items():
@@ -110,8 +110,8 @@ def generate_excel_reports(month):
     report_venue_dates_with_workers_to_excel(month, wb)
 
     # Ensure the directory exists
-    makedirs("output/excel", exist_ok=True)
+    makedirs(config.get_location('excel_reports'), exist_ok=True)
 
     # Save the workbook to a file
-    wb.save(f"output/excel/reports_{month}.xlsx")
+    wb.save(f"{config.get_location('excel_reports')}reports_{month}.xlsx")
 

@@ -1,6 +1,7 @@
 
 from json_handler import *
 import re
+import excel_handler
 
 def remove_color_codes(text):
     # Regular expression pattern to match ANSI escape codes
@@ -19,16 +20,16 @@ class Colors:
 
 def save_report_to_file(content, filename):
     # Ensure the directory exists
-    if not path.exists("output/reports"):
-        makedirs("output/reports")
+    path = config.get_location("txt_reports")
+    makedirs(path, exist_ok=True)
     clean_content = remove_color_codes(content)
 
-    with open(f"output/reports/{filename}", 'w') as file:
+    with open(f"{path}{filename}", 'w') as file:
         file.write(clean_content)
 
 
 def report_work_by_date(month):
-    schedule_data = load_data_from_json(f"output/schedule_{month}.json")
+    schedule_data = load_data_from_json(f"{config.get_location('output')}schedule_{month}.json")
 
     # Create a dictionary to group assignments by date
     grouped_by_date = {}
@@ -66,7 +67,7 @@ def report_work_by_date(month):
 
 
 def report_venue_dates_with_workers(month):
-    schedule_data = load_data_from_json(f"output/schedule_{month}.json")
+    schedule_data = load_data_from_json(f"{config.get_location('output')}schedule_{month}.json")
 
     report_content = ""
     for venue, dates in schedule_data.items():
@@ -79,7 +80,7 @@ def report_venue_dates_with_workers(month):
     save_report_to_file(report_content, f"venue_dates_with_workers_{month}.txt")
 
 def report_worker_shifts(month):
-    schedule_data = load_data_from_json(f"output/schedule_{month}.json")
+    schedule_data = load_data_from_json(f"{config.get_location('output')}schedule_{month}.json")
 
     worker_shifts = {}
     for venue, dates in schedule_data.items():
@@ -100,10 +101,10 @@ def report_worker_shifts(month):
     save_report_to_file(report_content, f"worker_shifts_{month}.txt")
 
 def report_errors(month):
-    schedule_data = load_data_from_json(f"output/schedule_{month}.json")
+    schedule_data = load_data_from_json(f"{config.get_location('output')}schedule_{month}.json")
     employees_data = load_data_from_json("employees.json")
-    shifts_data = load_data_from_json(f"data/shifts_{month}.json")
-    venues_data = load_data_from_json(f"data/venues_{month}.json")
+    shifts_data = load_data_from_json(f"{config.get_location('data')}shifts_{month}.json")
+    venues_data = load_data_from_json(f"{config.get_location('data')}venues_{month}.json")
 
     employee_unavailable_dates = {shift["id"]: shift["unavailable_dates"] for shift in shifts_data}
     employee_allowed_venues = {emp["id"]: emp["allowed_venues"] for emp in employees_data}
@@ -140,3 +141,10 @@ def report_errors(month):
     save_report_to_file(report_content, f"errors_{month}.txt")
 
     return all_is_well
+
+def generate_all_reports(month):
+    report_work_by_date(month)
+    report_venue_dates_with_workers(month)
+    report_worker_shifts(month)
+    report_errors(month)
+    excel_handler.generate_excel_reports(month)

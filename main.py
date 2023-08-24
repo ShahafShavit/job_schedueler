@@ -1,7 +1,11 @@
-from testing import *
-from reports import *
-import excel_handler
+from json_handler import *
+from random import choice
+import testing
+import reports
 import ics_handler
+
+
+
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<< EMPLOYEE AND EMPLOYEES CLASSES >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -22,7 +26,7 @@ class Employees:
 
     def load_employee_data(self):
         employees_data = load_data_from_json("employees.json")
-        shifts_data = load_data_from_json(f"data/shifts_{self.month}.json")
+        shifts_data = load_data_from_json(f"{config.get_location('data')}shifts_{self.month}.json")
 
         employees = []
         for data in employees_data:
@@ -39,7 +43,7 @@ class Employees:
         save_data_to_json("employees.json", data)
 
         shifts_data = [{"id": emp.id, "unavailable_dates": emp.unavailable_dates} for emp in self.employees]
-        save_data_to_json(f"data/shifts_{self.month}.json", shifts_data)
+        save_data_to_json(f"{config.get_location('data')}shifts_{self.month}.json", shifts_data)
 
 
     def add_or_update_employee(self, employee_id, allowed_venues, unavailable_dates):
@@ -86,12 +90,12 @@ class Venue:
 
     @classmethod
     def load_all_from_file(cls, month):
-        venues_data = load_data_from_json(f"data/venues_{month}.json")
+        venues_data = load_data_from_json(f"{config.get_location('data')}venues_{month}.json")
         return [cls(data["name"], data["event_dates"]) for data in venues_data]
     @classmethod
     def save_all_to_file(cls, month, venues):
         data = [{"name": venue.name, "event_dates": venue.event_dates} for venue in venues]
-        save_data_to_json(f"data/venues_{month}.json", data)
+        save_data_to_json(f"{config.get_location('data')}venues_{month}.json", data)
 
     @classmethod
     def add_or_update_venue(cls, month, venue_name, event_dates):
@@ -184,7 +188,7 @@ class Schedule:
 
     def assign_employee_to_date(self, date, available_employees):
         if not available_employees:
-            return "EMPTY"
+            return config.get_default('default_empty_shift')
 
         # Sort employees by shift count
         available_employees.sort(key=lambda x: x.shift_count)
@@ -192,7 +196,7 @@ class Schedule:
         # If multiple employees have the same shift count, choose randomly among them
         min_shifts = available_employees[0].shift_count
         candidates = [emp for emp in available_employees if emp.shift_count == min_shifts]
-        chosen_employee = random.choice(candidates)
+        chosen_employee = choice(candidates)
 
         chosen_employee.shift_count += 1
         return chosen_employee
@@ -254,9 +258,9 @@ class Schedule:
 # <<<<<<<<<<<<<<<<<<<<<<<<<<< MISC FUNCTIONS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 def fix_shift_imbalances(month):
-    schedule_data = load_data_from_json(f"output/schedule_{month}.json")
+    schedule_data = load_data_from_json(f"{config.get_location('output')}schedule_{month}.json")
     employees_data = load_data_from_json("employees.json")
-    shifts_data = load_data_from_json(f"data/shifts_{month}.json")
+    shifts_data = load_data_from_json(f"{config.get_location('data')}shifts_{month}.json")
 
     # Calculate the average number of shifts per employee
     total_shifts = sum([len(dates) for _, dates in schedule_data.items()])
@@ -290,7 +294,7 @@ def fix_shift_imbalances(month):
                             break
 
     # Save the modified schedule
-    save_data_to_json(f"output/schedule_{month}.json", schedule_data)
+    save_data_to_json(f"{config.get_location('output')}schedule_{month}.json", schedule_data)
 
 
 
@@ -302,22 +306,19 @@ def main():
 
     # If the schedule doesn't exist, generate it
     if not monthly_schedule.schedule_exists():
+        print("Monthly schedule not yet created, creating schedule.")
         for venue in venues:
             monthly_schedule.generate_schedule_for_venue(venue, employee_manager.employees)
         monthly_schedule.save_to_file()
 
-    # report_work_by_date(month)
-    # report_venue_dates_with_workers(month)
-    # report_worker_shifts(month)
-    # report_errors(month)
-    # excel_handler.generate_excel_reports(month)
+    reports.generate_all_reports(month)
     ics_handler.generate_ics(monthly_schedule,month)
     # monthly_schedule.manually_add_popup_event(employee_manager)
 
 def test(month):
-    delete_files_for_month(month)
-    generate_dummy_venue_data(month)
-    generate_dummy_shift_data(month)
+    testing.delete_files_for_month(month)
+    testing.generate_dummy_venue_data(month)
+    testing.generate_dummy_shift_data(month)
 
     employee_manager = Employees(month)
     venues = Venue.load_all_from_file(month)
@@ -327,9 +328,9 @@ def test(month):
         monthly_schedule.generate_schedule_for_venue(venue, employee_manager.employees)
 
     monthly_schedule.save_to_file()
-    report_work_by_date(month)
-    report_venue_dates_with_workers(month)
-    report_worker_shifts(month)
-    report_errors(month)
+    reports.report_work_by_date(month)
+    reports.report_venue_dates_with_workers(month)
+    reports.report_worker_shifts(month)
+    reports.report_errors(month)
 
 main()

@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "locations": {
+      "data": "data/",
+      "employee_data": "",
+      "output": "output/",
+      "txt_reports": "output/reports/",
+      "excel_reports": "output/reports/",
+      "ics_export": "output/ics/"
+    },
+    "defaults": {
+      "default_time_start": "17:00:00",
+      "default_time_end": "23:59:00",
+      "default_email": "defaultmail@email.com",
+      "default_empty_shift": "EMPTY"
+    }
+  }
+}

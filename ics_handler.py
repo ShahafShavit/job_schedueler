@@ -1,5 +1,5 @@
 from ics import Calendar, Event, Attendee
-from json_handler import load_data_from_json,makedirs
+from json_handler import load_data_from_json,makedirs,config
 
 
 def generate_ics(schedule, month):
@@ -16,19 +16,19 @@ def generate_ics(schedule, month):
             formatted_date = f"2023-{month.zfill(2)}-{day.zfill(2)}"  # Assuming the year is 2023
             event = Event()
             event.name = f"Shift for {worker} in {venue}"
-            event.begin = f"{formatted_date} 17:00:00"
-            event.end = f"{formatted_date} 23:59:00"
+            event.begin = f"{formatted_date} {config.get_default('default_time_start')}"
+            event.end = f"{formatted_date} {config.get_default('default_time_end')}"
             event.location = venue
             event.description = f"Shift for {worker} at {venue} on {date}"
             worker_email = employee_email_map.get(worker)
             if worker_email:
-                # Create Attendee object for worker with RSVP functionality
+                # Create Attendee object for worker
                 worker_attendee = Attendee(email=worker_email, common_name=worker_email, role="REQ-PARTICIPANT"
                                            )
                 event.attendees.add(worker_attendee)
 
-                # Create Attendee object for default email without RSVP functionality
-                default_attendee = Attendee(email="defaultmail@gmail.com", common_name="defaultmail@gmail.com",
+                # Create Attendee object for default email
+                default_attendee = Attendee(email=config.get_default('default_email'), common_name=config.get_default('default_email'),
                                             role="NON-PARTICIPANT")
                 event.attendees.add(default_attendee)
 
@@ -36,7 +36,7 @@ def generate_ics(schedule, month):
             cal.events.add(event)
 
     # Ensure the directory exists
-    makedirs("output/ics", exist_ok=True)
+    makedirs(config.get_location('ics_export'), exist_ok=True)
     # Save the calendar to a file
-    with open(f"output/ics/schedule_{month}.ics", "w") as ics_file:
+    with open(f"{config.get_location('ics_export')}schedule_{month}.ics", "w") as ics_file:
         ics_file.write(cal.serialize())

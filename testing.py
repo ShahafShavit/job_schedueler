@@ -6,7 +6,7 @@ def generate_dummy_employee_data(month, num_employees=10): # <<<<< DEPRECATED >>
     data = []
 
     # Fetch the number of venues from the venues file
-    venues_data = load_data_from_json(f"data/venues_{month}.json")
+    venues_data = load_data_from_json(f"{config.get_location('data')}venues_{month}.json")
     num_venues = len(venues_data)
     venue_names = [venue["name"] for venue in venues_data]
 
@@ -22,7 +22,7 @@ def generate_dummy_employee_data(month, num_employees=10): # <<<<< DEPRECATED >>
     save_data_to_json(filename, data)
 
 def generate_dummy_shift_data(month):
-    filename = f"data/shifts_{month}.json"
+    filename = f"{config.get_location('data')}shifts_{month}.json"
     data = []
 
     # Fetch the employee names from the employees file
@@ -44,7 +44,7 @@ def generate_dummy_shift_data(month):
     save_data_to_json(filename, data)
 
 def generate_dummy_venue_data(month):
-    filename = f"data/venues_{month}.json"
+    filename = f"{config.get_location('data')}venues_{month}.json"
     data = []
 
     # Fetch the venue names from the employees file
@@ -70,9 +70,9 @@ def generate_dummy_venue_data(month):
 
 def delete_files_for_month(month):
     files_to_delete = [
-        f"data/venues_{month}.json",
-        f"data/shifts_{month}.json",
-        f"output/schedule_{month}.json"
+        f"{config.get_location('data')}venues_{month}.json",
+        f"{config.get_location('data')}shifts_{month}.json",
+        f"{config.get_location('output')}schedule_{month}.json"
     ]
 
     for filename in files_to_delete:
