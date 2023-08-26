@@ -1,6 +1,7 @@
 from json_handler import *
 import random
 from os import remove
+import openpyxl
 def generate_dummy_employee_data(month, num_employees=10): # <<<<< DEPRECATED >>>>>>>
     filename = "employees.json"
     data = []
@@ -20,6 +21,7 @@ def generate_dummy_employee_data(month, num_employees=10): # <<<<< DEPRECATED >>
         })
 
     save_data_to_json(filename, data)
+
 
 def generate_dummy_shift_data(month):
     filename = f"{config.get_location('data')}shifts_{month}.json"
@@ -83,3 +85,40 @@ def delete_files_for_month(month):
             print(f"{filename} not found.")
         except Exception as e:
             print(f"Error deleting {filename}: {e}")
+
+import openpyxl
+import random
+
+def generate_dummy_unavailability_in_excel(year, month):
+    # Load the Excel file
+    filename = f"{config.get_location('calender_export')}Hagashot_{month}_{year}.xlsx"
+    wb = openpyxl.load_workbook(filename)
+
+    # For each sheet (employee) in the workbook
+    for ws in wb.worksheets:
+        print(f"Processing for {ws.title}")  # Debug print
+
+        # For each day of the month
+        for day in range(1, 31):  # Assuming 30 days in the month for simplicity
+            # Find the column with this day
+            for col_num, col_cells in enumerate(ws.iter_cols(min_col=5, max_col=11, min_row=5, max_row=ws.max_row, values_only=True), 5):
+                if day in col_cells:
+                    print(f"Identified day {day} in column {col_num}")  # Debug print
+
+                    # Find the row of the identified day
+                    day_row = col_cells.index(day) + 5
+
+                    # Randomly decide whether to mark this day as unavailable
+                    if random.random() < 0.2:
+                        print(f"Marking day {day} as unavailable")  # Debug print
+
+                        # Randomly choose one of the two cells below the date cell
+                        unavailable_cell_row = day_row + random.randint(1, 2)
+                        ws.cell(row=unavailable_cell_row, column=col_num).value = 'No'
+                        break
+
+    # Save the modified Excel file
+    wb.save(filename)
+
+
+

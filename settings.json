@@ -6,7 +6,8 @@
       "output": "output/",
       "txt_reports": "output/reports/",
       "excel_reports": "output/reports/",
-      "ics_export": "output/ics/"
+      "ics_export": "output/ics/",
+      "calender_export": "output/calender/"
     },
     "defaults": {
       "default_time_start": "17:00:00",

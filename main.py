@@ -1,3 +1,4 @@
+import excel_handler
 from json_handler import *
 from random import choice
 import testing
@@ -316,21 +317,7 @@ def main():
     # monthly_schedule.manually_add_popup_event(employee_manager)
 
 def test(month):
-    testing.delete_files_for_month(month)
-    testing.generate_dummy_venue_data(month)
-    testing.generate_dummy_shift_data(month)
+    excel_handler.generate_monthly_calendar_excel(2023,9)
+    testing.generate_dummy_unavailability_in_excel(2023,9)
 
-    employee_manager = Employees(month)
-    venues = Venue.load_all_from_file(month)
-
-    monthly_schedule = Schedule(month)
-    for venue in venues:
-        monthly_schedule.generate_schedule_for_venue(venue, employee_manager.employees)
-
-    monthly_schedule.save_to_file()
-    reports.report_work_by_date(month)
-    reports.report_venue_dates_with_workers(month)
-    reports.report_worker_shifts(month)
-    reports.report_errors(month)
-
-main()
+test(9)

@@ -1,6 +1,8 @@
-from json_handler import *
+from openpyxl.utils import get_column_letter
 
-from openpyxl.styles import Font,Alignment
+from json_handler import *
+from calendar import monthrange, weekday, SUNDAY
+from openpyxl.styles import Font,Alignment,Border,Side
 from openpyxl import Workbook
 
 def column_auto_width(ws):
@@ -22,6 +24,7 @@ def column_auto_width(ws):
     for row in ws.iter_rows():
         for cell in row:
             cell.alignment = center_aligned
+
 
 
 def report_work_by_date_to_excel(month, wb):
@@ -101,6 +104,173 @@ def report_worker_shifts_to_excel(month, wb):
             row += 1
     column_auto_width(ws)
 
+
+def report_employee_availability_to_excel(month, wb):
+    # Load employee data, shifts data, and venues data
+    employees = load_data_from_json("employees.json")
+    shifts_data = load_data_from_json(f"{config.get_location('data')}shifts_{month}.json")
+    venues = load_data_from_json(f"{config.get_location('data')}venues_{month}.json")
+
+    # Create a dictionary to map employee IDs to their unavailable dates
+    unavailable_dates_map = {shift["id"]: shift["unavailable_dates"] for shift in shifts_data}
+    # Determine the last day of the month
+    _, last_day = monthrange(2023, int(month))  # Assuming the year is 2023
+
+    # Generate the date range
+    dates = [f"{day}/{month}" for day in range(1, last_day + 1)]
+
+    # Create a new sheet in the workbook
+    ws = wb.create_sheet(title="Employee Availability")
+
+    # Set dates as column headers
+    ws.append(["Employee"] + dates)
+
+    # Fill in employee availability
+    for employee in employees:
+        row_data = [employee["id"]]
+        for date in dates:
+            # Check if employee is available on this date using the unavailable_dates_map
+            if date in unavailable_dates_map.get(employee["id"], []):
+                row_data.append("")  # Employee is unavailable
+            else:
+                row_data.append(employee["id"])  # Employee is available
+        ws.append(row_data)
+
+    # Add a blank row after employee availability data
+    ws.append([])
+
+    # Add venue event dates
+    for venue in venues:
+        venue_name = venue["name"]
+        row_data = [venue_name]
+        for date in dates:
+            if date in venue["event_dates"]:
+                row_data.append(venue_name)
+            else:
+                row_data.append("")
+        ws.append(row_data)
+
+    column_auto_width(ws)
+
+
+def add_borders_to_calendar_cell(worksheet, start_row_idx, col_idx):
+    thin_border = Border(top=Side(style='thin'),
+                         right=Side(style='thin'),
+                         bottom=Side(style='thin'),
+                         left=Side(style='thin'))
+
+    # Top cell gets top and side borders
+    top_cell = worksheet.cell(row=start_row_idx, column=col_idx)
+    top_cell.border = Border(top=thin_border.top,
+                             right=thin_border.right,
+                             left=thin_border.left)
+
+    # Middle cell gets only side borders
+    middle_cell = worksheet.cell(row=start_row_idx + 1, column=col_idx)
+    middle_cell.border = Border(right=thin_border.right,
+                                left=thin_border.left)
+
+    # Bottom cell gets bottom and side borders
+    bottom_cell = worksheet.cell(row=start_row_idx + 2, column=col_idx)
+    bottom_cell.border = Border(bottom=thin_border.bottom,
+                                right=thin_border.right,
+                                left=thin_border.left)
+
+
+def set_column_widths(worksheet, start_col, end_col, width):
+    """
+    Set the width of a range of columns in an Excel worksheet.
+    """
+
+    for col_idx in range(start_col, end_col + 1):
+        col_letter = get_column_letter(col_idx)
+        worksheet.column_dimensions[col_letter].width = width
+
+def generate_monthly_calendar_excel(year, month):
+    # Load employee data
+    employees = load_data_from_json("employees.json")
+
+    # Create a new workbook
+    wb = Workbook()
+
+    # Remove the default sheet created
+    wb.remove(wb.active)
+
+    # Hebrew names for the days of the week in the correct order
+    hebrew_days = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"]
+
+    # Loop through each employee
+    for employee in employees:
+        employee_name = employee["id"]
+
+        # Create a new sheet for the employee
+        ws = wb.create_sheet(title=employee_name)
+
+        # Set the sheet to RTL
+        ws.sheet_view.rightToLeft = True
+        # Merge cells and set values
+        ws.merge_cells('E1:K2')
+        ws['E1'].value = f'הגשות עבור {employee_name}'
+        ws.merge_cells('E3:K4')
+        ws['E3'].value = f'{month}/{year}'
+
+        # Set alignment for merged cells
+        center_alignment = Alignment(horizontal='center', vertical='center')
+        ws['E1'].alignment = center_alignment
+        ws['E3'].alignment = center_alignment
+
+        # Set the headers for the days of the week starting with Sunday
+        for idx, day in enumerate(hebrew_days, start=5):  # Starting from the 5th column
+            ws.cell(row=5, column=idx).value = day
+
+        # Determine the first day of the month and the last day of the month
+        first_weekday, last_day = monthrange(year, int(month))
+
+        # Adjust the weekday to start with Sunday
+        first_weekday = (first_weekday + 1) % 7
+
+        # Initialize variables to keep track of the current date and current weekday
+        current_date = 1
+        current_weekday = first_weekday
+
+        # Loop through the weeks of the month
+        row_start = 6  # Starting from the 6th row
+        while current_date <= last_day:
+            # Create a row for the dates
+            date_row = ["" for _ in range(7)]
+            # Fill in the dates for this week
+            for i in range(current_weekday, 7):
+                if current_date <= last_day:
+                    date_row[i] = current_date
+                    current_date += 1
+            for idx, date in enumerate(date_row, start=5):  # Starting from the 5th column
+                ws.cell(row=row_start, column=idx).value = date
+
+            # Add two empty rows
+            row_start += 1
+            for idx in range(5, 12):  # Columns E to K
+                ws.cell(row=row_start, column=idx).value = ""
+                add_borders_to_calendar_cell(ws, row_start - 1, idx)
+            row_start += 1
+            for idx in range(5, 12):  # Columns E to K
+                ws.cell(row=row_start, column=idx).value = ""
+
+            # Reset the current weekday for the next week
+            current_weekday = 0
+            row_start += 1
+
+        set_column_widths(ws, 5, 11, 15)
+
+        center_alignment = Alignment(horizontal='center', vertical='center')
+
+        for row in ws.iter_rows():
+            for cell in row:
+                cell.alignment = center_alignment
+
+    makedirs(config.get_location('calender_export'), exist_ok=True)
+    # Save the workbook to a file
+    wb.save(f"{config.get_location('calender_export')}Hagashot_{month}_{year}.xlsx")
+
 def generate_excel_reports(month):
     wb = Workbook()
     wb.remove(wb.active)  # Remove the default sheet
@@ -108,10 +278,10 @@ def generate_excel_reports(month):
     report_worker_shifts_to_excel(month, wb)
     report_work_by_date_to_excel(month, wb)
     report_venue_dates_with_workers_to_excel(month, wb)
+    report_employee_availability_to_excel(month, wb)
 
     # Ensure the directory exists
     makedirs(config.get_location('excel_reports'), exist_ok=True)
 
     # Save the workbook to a file
     wb.save(f"{config.get_location('excel_reports')}reports_{month}.xlsx")
-
