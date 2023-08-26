@@ -7,13 +7,15 @@
       "txt_reports": "output/reports/",
       "excel_reports": "output/reports/",
       "ics_export": "output/ics/",
-      "calender_export": "output/calender/"
+      "calendar_export": "output/calendar/"
     },
     "defaults": {
       "default_time_start": "17:00:00",
       "default_time_end": "23:59:00",
       "default_email": "defaultmail@email.com",
-      "default_empty_shift": "EMPTY"
+      "default_empty_shift": "EMPTY",
+      "default_shifts_per_day": 2,
+      "default_shift_names": ["בוקר", "ערב"]
     }
   }
 }

@@ -13,12 +13,16 @@ import ics_handler
 class Employee:
     def __init__(self, id, allowed_venues):
         self.id = id
-        self.allowed_venues = allowed_venues  # This is now a dictionary with venue names as keys and weights as values
-        self.unavailable_dates = []
+        self.allowed_venues = allowed_venues  # Dictionary with venue names as keys and weights as values
+        self.unavailable_dates = {}  # Dictionary with dates as keys and list of booleans as values
         self.shift_count = 0
 
     def increment_shift(self):
         self.shift_count += 1
+
+    def set_unavailability(self, date, shifts):
+        """Set unavailability for specific shifts on a given date."""
+        self.unavailable_dates[date] = shifts
 
 class Employees:
     def __init__(self, month):
@@ -50,7 +54,7 @@ class Employees:
     def add_or_update_employee(self, employee_id, allowed_venues, unavailable_dates):
         for emp in self.employees:
             if emp.id == employee_id:
-                emp.unavailable_dates = unavailable_dates
+                emp.unavailable_dates = unavailable_dates  # Now a dictionary
                 emp.allowed_venues = allowed_venues
                 return
         self.employees.append(Employee(employee_id, allowed_venues))
@@ -69,12 +73,14 @@ class Employees:
         while employee_id not in available_employee_ids:
             print("Invalid employee ID. Please choose from the list above.")
             employee_id = input("Enter the employee ID: ")
-        unavailable_dates = input(
-            "Enter the unavailable dates for the employee (comma-separated, e.g., 1/09,2/09,...): ").split(',')
+
+        date = input("Enter the unavailable date for the employee (format: DD/MM): ")
+        morning_unavailable = input("Is the employee unavailable in the morning? (yes/no) ").lower() == 'yes'
+        evening_unavailable = input("Is the employee unavailable in the evening? (yes/no) ").lower() == 'yes'
 
         for emp in self.employees:
             if emp.id == employee_id:
-                emp.unavailable_dates.extend(unavailable_dates)
+                emp.set_unavailability(date, [morning_unavailable, evening_unavailable])
                 break
         else:
             print(f"No employee found with ID {employee_id}")
@@ -87,12 +93,13 @@ class Employees:
 class Venue:
     def __init__(self, name, event_dates):
         self.name = name
-        self.event_dates = event_dates
+        self.event_dates = event_dates  # This is now a dictionary with dates as keys and shifts as values
 
     @classmethod
     def load_all_from_file(cls, month):
         venues_data = load_data_from_json(f"{config.get_location('data')}venues_{month}.json")
         return [cls(data["name"], data["event_dates"]) for data in venues_data]
+
     @classmethod
     def save_all_to_file(cls, month, venues):
         data = [{"name": venue.name, "event_dates": venue.event_dates} for venue in venues]
@@ -125,31 +132,40 @@ class Venue:
         while venue_name not in available_venues:
             print("Invalid venue name. Please choose from the list above.")
             venue_name = input("Enter the venue name: ")
-        event_dates = input("Enter the event dates for the venue (comma-separated, e.g., 1/09,2/09,...): ").split(',')
+
+        event_dates = {}
+        num_dates = int(input("How many dates do you want to add? "))
+        for _ in range(num_dates):
+            date = input("Enter the date (format: DD/MM): ")
+            morning_event = input("Is there a morning event on this date? (yes/no) ").lower() == 'yes'
+            evening_event = input("Is there an evening event on this date? (yes/no) ").lower() == 'yes'
+            event_dates[date] = [morning_event, evening_event]
 
         # Load existing venue data
         venues = cls.load_all_from_file(month)
         for venue in venues:
             if venue.name == venue_name:
-                venue.event_dates.extend(event_dates)
+                venue.event_dates.update(event_dates)
                 break
         else:
             venues.append(cls(venue_name, event_dates))
 
         cls.save_all_to_file(month, venues)
 
-
     @classmethod
     def add_popup_event(cls, month, venue_name, event_date):
         venues = cls.load_all_from_file(month)
+        morning_event = False  # Assuming no morning events for now
+        evening_event = True   # Assuming all events are in the evening for now
         for venue in venues:
             if venue.name == venue_name:
                 if event_date not in venue.event_dates:
-                    venue.event_dates.append(event_date)
+                    venue.event_dates[event_date] = [morning_event, evening_event]
                 break
         else:
-            venues.append(cls(venue_name, [event_date]))
+            venues.append(cls(venue_name, {event_date: [morning_event, evening_event]}))
         cls.save_all_to_file(month, venues)
+
 
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<< SCHEDULE CLASS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -169,25 +185,22 @@ class Schedule:
     def load_from_file(self):
         self.schedule_data = load_data_from_json(f"output/schedule_{self.month}.json")
 
-    def add_to_schedule(self, venue_name, date, employee_id):
+    def add_to_schedule(self, venue_name, date, shift_name, employee_id):
         if venue_name not in self.schedule_data:
             self.schedule_data[venue_name] = {}
-        self.schedule_data[venue_name][date] = employee_id
-        if date not in self.temp_unavailable:
-            self.temp_unavailable[date] = []
-        self.temp_unavailable[date].append(employee_id)
+        if date not in self.schedule_data[venue_name]:
+            self.schedule_data[venue_name][date] = {}
+        self.schedule_data[venue_name][date][shift_name] = employee_id
 
-    def get_available_employees(self, date, venue_name, employees):
-        available_employees = [employee for employee in employees if
-                               date not in employee.unavailable_dates and employee.id not in self.temp_unavailable.get(
-                                   date, []) and venue_name in employee.allowed_venues]
+    def get_available_employees(self, date, shift, venue_name, employees):
+        default_unavailability = [False] * config.get_default('default_shifts_per_day')
 
-        # Sort by venue preference weight (higher weight first) and then by shift count (lower count first)
-        available_employees.sort(key=lambda x: (-x.allowed_venues.get(venue_name, 0), x.shift_count))
+        return [employee for employee in employees if
+                not employee.unavailable_dates.get(date, default_unavailability)[shift] and
 
-        return available_employees
+                venue_name in employee.allowed_venues]
 
-    def assign_employee_to_date(self, date, available_employees):
+    def assign_employee_to_date(self, date, shift, available_employees):
         if not available_employees:
             return config.get_default('default_empty_shift')
 
@@ -203,14 +216,34 @@ class Schedule:
         return chosen_employee
 
     def generate_schedule_for_venue(self, venue, employees):
-        for date in venue.event_dates:
-            available_employees = self.get_available_employees(date, venue.name, employees)
-            chosen_employee = self.assign_employee_to_date(date, available_employees)
+        shifts_per_day = config.get_default('default_shifts_per_day')
+        shift_names = config.get_default('default_shift_names')
 
-            # If chosen_employee is an Employee object, get its ID. Otherwise, it's "EMPTY".
-            employee_id = chosen_employee.id if isinstance(chosen_employee, Employee) else chosen_employee
+        for date, shifts in venue.event_dates.items():
+            for shift, is_event in enumerate(shifts):
+                if is_event:
+                    available_employees = self.get_available_employees(date, shift, venue.name, employees)
+                    chosen_employee = self.assign_employee_to_date(date, shift, available_employees)
 
-            self.add_to_schedule(venue.name, date, employee_id)
+                    # Check if chosen_employee is an Employee object
+                    if isinstance(chosen_employee, Employee):
+                        # Ensure the unavailable_dates entry for the given date has the correct number of shifts
+                        if date not in chosen_employee.unavailable_dates:
+                            chosen_employee.unavailable_dates[date] = [False] * shifts_per_day
+
+                        # Set the current shift as unavailable for the chosen employee
+                        chosen_employee.unavailable_dates[date][shift] = True
+
+                        # If there's a next shift, set it as unavailable for the chosen employee
+                        if shift + 1 < shifts_per_day:
+                            chosen_employee.unavailable_dates[date][shift + 1] = True
+
+                        employee_id = chosen_employee.id
+                    else:
+                        employee_id = chosen_employee  # This is the default "EMPTY" value
+
+                    # Use shift names from the config instead of shift numbers
+                    self.add_to_schedule(venue.name, date, shift_names[shift], employee_id)
 
     def save_to_file(self):
         save_data_to_json(f"output/schedule_{self.month}.json", self.schedule_data)
@@ -235,25 +268,28 @@ class Schedule:
 
         event_date = input("Enter the date for the pop-up event (format: DD/MM): ")
 
-        # Get the list of available employees for the given venue and date
-        available_employees = self.get_available_employees(event_date, venue_name, employees_obj.employees)
+        shifts_per_day = config.get_default('default_shifts_per_day')
+        for shift in range(shifts_per_day):
+            # Get the list of available employees for the given venue and date
+            available_employees = self.get_available_employees(event_date, shift, venue_name, employees_obj.employees)
 
-        # Display the list of available employees
-        print(f"\nAvailable employees for {venue_name} on {event_date}:")
-        for emp in available_employees:
-            print(emp.id)
+            # Display the list of available employees
+            print(f"\nAvailable employees for {venue_name} on {event_date} for shift {shift + 1}:")
+            for emp in available_employees:
+                print(emp.id)
 
-        # Update the schedule_data with the list of available employees
-        if venue_name not in self.schedule_data:
-            self.schedule_data[venue_name] = {}
-        self.schedule_data[venue_name][event_date] = [emp.id for emp in available_employees]
+            # Update the schedule_data with the list of available employees
+            if venue_name not in self.schedule_data:
+                self.schedule_data[venue_name] = {}
+            if event_date not in self.schedule_data[venue_name]:
+                self.schedule_data[venue_name][event_date] = {}
+            self.schedule_data[venue_name][event_date][shift] = [emp.id for emp in available_employees]
 
         # Save the updated schedule_data to the schedule.json file
         self.save_to_file()
 
         # Update the venues_*.json file
         Venue.add_popup_event(self.month, venue_name, event_date)
-
 
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<< MISC FUNCTIONS >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -300,7 +336,7 @@ def fix_shift_imbalances(month):
 
 
 def main():
-    month = "09"
+    month = "9"
     employee_manager = Employees(month)
     venues = Venue.load_all_from_file(month)
     monthly_schedule = Schedule(month)
@@ -312,12 +348,16 @@ def main():
             monthly_schedule.generate_schedule_for_venue(venue, employee_manager.employees)
         monthly_schedule.save_to_file()
 
-    reports.generate_all_reports(month)
-    ics_handler.generate_ics(monthly_schedule,month)
+    # reports.generate_all_reports(month)
+    # ics_handler.generate_ics(monthly_schedule,month)
     # monthly_schedule.manually_add_popup_event(employee_manager)
 
-def test(month):
-    excel_handler.generate_monthly_calendar_excel(2023,9)
-    testing.generate_dummy_unavailability_in_excel(2023,9)
+def test():
+    testing.generate_dummy_venue_data(9)
+    excel_handler.generate_monthly_calendar_excel(9, 2023)
+    testing.generate_dummy_unavailability_in_excel(9, 2023)
+    excel_handler.extract_unavailability_from_excel(9,2023)
 
-test(9)
+
+
+main()

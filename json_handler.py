@@ -4,7 +4,7 @@ from os import makedirs, path
 
 
 def load_data_from_json(filename):
-    with open(filename, 'r') as file:
+    with open(filename, 'r', encoding='utf-8') as file:
         return json.load(file)
 
 def save_data_to_json(filename, data):
@@ -14,8 +14,8 @@ def save_data_to_json(filename, data):
         makedirs(directory)
 
     # Save the data to the file
-    with open(filename, 'w') as file:
-        json.dump(data, file, indent=4)
+    with open(filename, 'w', encoding='utf-8') as file:
+        json.dump(data, file, indent=4, ensure_ascii=False)
 
 class Config:
     _instance = None
