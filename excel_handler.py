@@ -1,9 +1,9 @@
-from openpyxl.utils import get_column_letter
-
-from json_handler import *
-from calendar import monthrange, weekday, SUNDAY
-from openpyxl.styles import Font,Alignment,Border,Side
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font,Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from calendar import day_name, monthrange
+from json_handler import *
+
 
 def column_auto_width(ws):
     for column in ws.columns:
@@ -332,4 +332,47 @@ def extract_unavailability_from_excel(month, year):
 
     save_data_to_json(f"{config.get_location('data')}shifts_{month}.json",all_unavailability_data)
 
+
+from datetime import date
+
+
+def display_availability_in_excel(month, year):
+    # Load unavailability data
+    unavailability_data = load_data_from_json(f"{config.get_location('data')}shifts_{month}.json")
+    shifts_per_day = config.get_default('default_shifts_per_day')
+    shift_names = config.get_default('default_shift_names')
+
+    # Create a new workbook and select the active worksheet
+    wb = Workbook()
+    ws = wb.active
+
+    # Offset values
+    row_offset = 4
+    col_offset = 2
+
+    # Write the dates and day names
+    for day in range(1, monthrange(year, month)[1] + 1):
+        ws.cell(row=row_offset, column=day + col_offset).value = f"{day}/{month}"
+        weekday = day_name[date(year, month, day).weekday()]
+        ws.cell(row=row_offset + 1, column=day + col_offset).value = weekday
+
+    # Write availability data for each shift
+    for shift in range(shifts_per_day):
+        # Merge cells for shift name
+        start_merge_row = row_offset + 2 + shift * len(unavailability_data)
+        end_merge_row = start_merge_row + len(unavailability_data) - 1
+        ws.merge_cells(start_row=start_merge_row, start_column=col_offset, end_row=end_merge_row, end_column=col_offset)
+        merged_cell = ws.cell(row=start_merge_row, column=col_offset)
+        merged_cell.value = shift_names[shift]
+        merged_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        for idx, employee_data in enumerate(unavailability_data):
+            for day in range(1, monthrange(year, month)[1] + 1):
+                date_str = f"{day}/{month}"
+                if not employee_data["unavailable_dates"].get(date_str, [False] * shifts_per_day)[shift]:
+                    ws.cell(row=row_offset + 2 + idx + shift * len(unavailability_data), column=day + col_offset).value = employee_data["id"]
+
+    # Save the workbook
+    makedirs(config.get_location('excel_reports'),exist_ok=True)
+    wb.save(f"{config.get_location('excel_reports')}availability_{month}_{year}.xlsx")
 
