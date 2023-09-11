@@ -113,28 +113,38 @@ def generate_dummy_unavailability_in_excel(month, year):
     # Fetch the number of shifts per day from the settings
     shifts_per_day = config.get_default('default_shifts_per_day')
 
+    # Using the first worksheet to determine the potential cells
+    ws = wb.worksheets[0]
+
+    # Create a list of all potential cells that can be marked as unavailable
+    potential_cells = []
+
+    # Start from column E (5) and row 6
+    for col_num in range(5, 12):  # Columns for days of the week
+        for row_num in range(6, ws.max_row + 1):
+            cell = ws.cell(row=row_num, column=col_num)
+            # Check if the cell contains an integer (date)
+            if isinstance(cell.value, int):
+                # Check the cells below it to see if they form a valid calendar cell
+                for shift in range(1, shifts_per_day + 1):
+                    below_cell = ws.cell(row=row_num + shift, column=col_num)
+                    # Ensure the cell is empty
+                    if not below_cell.value:
+                        potential_cells.append(below_cell)
+
     # For each sheet (employee) in the workbook
     for ws in wb.worksheets:
-
-        # For each day of the month
-        for day in range(1, 31):  # Assuming 30 days in the month for simplicity
-            # Find the column with this day
-            for col_num, col_cells in enumerate(ws.iter_cols(min_col=5, max_col=11, min_row=7, max_row=ws.max_row, values_only=True), 5):
-                if day in col_cells:
-
-                    # Find the row of the identified day
-                    day_row = col_cells.index(day) + 7
-
-                    # Randomly decide whether to mark this day as unavailable for any of the shifts
-                    for shift in range(1, shifts_per_day + 1):
-                        if random.random() < 0.2:
-
-                            # Mark the cell corresponding to the shift as unavailable
-                            unavailable_cell_row = day_row + shift
-                            ws.cell(row=unavailable_cell_row, column=col_num).value = 'No'
-                    break
+        # Fill each potential cell with 'No' for testing purposes
+        for cell in potential_cells:
+            if random.random() < 0.2:
+                ws.cell(row=cell.row, column=cell.column).value = 'No'
 
     # Save the modified Excel file
     wb.save(filename)
+
+
+
+
+
 
 

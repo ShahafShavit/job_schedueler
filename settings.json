@@ -10,12 +10,11 @@
       "calendar_export": "output/calendar/"
     },
     "defaults": {
-      "default_time_start": "17:00:00",
-      "default_time_end": "23:59:00",
       "default_email": "defaultmail@email.com",
       "default_empty_shift": "EMPTY",
       "default_shifts_per_day": 2,
-      "default_shift_names": ["בוקר", "ערב"]
+      "default_shift_names": ["בוקר", "ערב"],
+      "shift_times": [["11:00:00", "17:00:00"],["17:00:00","23:59:00"]]
     }
   }
 }

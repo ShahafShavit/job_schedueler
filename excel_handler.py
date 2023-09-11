@@ -281,6 +281,7 @@ def generate_monthly_calendar_excel(month, year):
     makedirs(config.get_location('calendar_export'), exist_ok=True)
     # Save the workbook to a file
     wb.save(f"{config.get_location('calendar_export')}Hagashot_{month}_{year}.xlsx")
+    print(f"Generated a calender for {month}/{year}, File: {config.get_location('calendar_export')}Hagashot_{month}_{year}.xlsx")
 
 
 def extract_unavailability_from_excel(month, year):
@@ -320,7 +321,7 @@ def extract_unavailability_from_excel(month, year):
             for shift in range(1, shifts_per_day + 1):
                 row += 1
                 for col, date in enumerate(week_dates, start=5):
-                    if ws.cell(row=row, column=col).value == "No":
+                    if ws.cell(row=row, column=col).value in ["No", "לא"]:
                         if f"{date}/{month}" not in employee_unavailability["unavailable_dates"]:
                             employee_unavailability["unavailable_dates"][f"{date}/{month}"] = [False] * shifts_per_day
                         employee_unavailability["unavailable_dates"][f"{date}/{month}"][shift - 1] = True
@@ -331,7 +332,7 @@ def extract_unavailability_from_excel(month, year):
         all_unavailability_data.append(employee_unavailability)
 
     save_data_to_json(f"{config.get_location('data')}shifts_{month}.json",all_unavailability_data)
-
+    print(f"Extracted unavailability from Excel file, File: {config.get_location('data')}shifts_{month}.json")
 
 from datetime import date
 
@@ -375,4 +376,5 @@ def display_availability_in_excel(month, year):
     # Save the workbook
     makedirs(config.get_location('excel_reports'),exist_ok=True)
     wb.save(f"{config.get_location('excel_reports')}availability_{month}_{year}.xlsx")
+    print(f"Generated availability report in Excel. File: {config.get_location('excel_reports')}availability_{month}_{year}.xlsx")
 

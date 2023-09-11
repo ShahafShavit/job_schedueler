@@ -349,15 +349,8 @@ def main():
         monthly_schedule.save_to_file()
 
     # reports.generate_all_reports(month)
-    # ics_handler.generate_ics(monthly_schedule,month)
+    ics_handler.generate_ics(monthly_schedule,month)
     # monthly_schedule.manually_add_popup_event(employee_manager)
 
-def test():
-    testing.generate_dummy_venue_data(9)
-    excel_handler.generate_monthly_calendar_excel(9, 2023)
-    testing.generate_dummy_unavailability_in_excel(9, 2023)
-    excel_handler.extract_unavailability_from_excel(9,2023)
-
-
-
-main()
+# TODO: 1. Add venue event generation friday double-event
+# TODO: 2. fix circular error for file dependencies when trying to generate testing data. generate some default data.
